@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>제로제로 게임</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- 로비 화면 -->
+  <div id="lobby" class="screen active">
+    <div class="container">
+      <h1>제로제로</h1>
+      <input type="text" id="playerName" placeholder="이름 입력" maxlength="10">
+      <div class="buttons">
+        <button id="createBtn" class="btn">방 만들기</button>
+        <button id="joinBtn" class="btn">방 참여하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 방 입장 대기 화면 -->
+  <div id="waiting" class="screen">
+    <div class="container">
+      <h2>방 코드: <span id="roomCode"></span></h2>
+      <div id="playerList"></div>
+      <button id="startBtn" class="btn">게임 시작</button>
+    </div>
+  </div>
+
+  <!-- 게임 화면 -->
+  <div id="game" class="screen">
+    <div class="game-container">
+      <div class="top-section">
+        <div id="playerInfo"></div>
+      </div>
+      
+      <div class="main-section">
+        <div id="zeroZeroAnim" class="zero-animation"></div>
+        <div id="resultDisplay" class="result-display"></div>
+        
+        <div id="controls" class="controls">
+          <div class="control-group">
+            <label>말할 숫자</label>
+            <select id="spokenNum"></select>
+          </div>
+          <div class="control-group">
+            <label>낼 숫자</label>
+            <select id="raisedNum"></select>
+          </div>
+          <button id="submitBtn" class="btn">확인</button>
+        </div>
+      </div>
+      
+      <div class="chat-section">
+        <div id="chatBox"></div>
+        <div class="chat-input">
+          <input type="text" id="chatInput" placeholder="채팅...">
+          <button id="sendChat">전송</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 방 참여 모달 -->
+  <div id="joinModal" class="modal">
+    <div class="modal-content">
+      <h3>방 참여</h3>
+      <input type="text" id="roomCodeInput" placeholder="방 코드 입력" maxlength="6">
+      <div class="modal-buttons">
+        <button id="confirmJoin" class="btn">참여</button>
+        <button id="cancelJoin" class="btn-secondary">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="game.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
