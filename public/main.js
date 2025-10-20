@@ -4,6 +4,7 @@ const socket = io();
 // DOM 요소
 const screens = {
   lobby: document.getElementById('lobby'),
+  roomList: document.getElementById('roomList'),
   waiting: document.getElementById('waiting'),
   game: document.getElementById('game')
 };
@@ -12,10 +13,8 @@ const elements = {
   playerName: document.getElementById('playerName'),
   createBtn: document.getElementById('createBtn'),
   joinBtn: document.getElementById('joinBtn'),
-  joinModal: document.getElementById('joinModal'),
-  roomCodeInput: document.getElementById('roomCodeInput'),
-  confirmJoin: document.getElementById('confirmJoin'),
-  cancelJoin: document.getElementById('cancelJoin'),
+  backToLobby: document.getElementById('backToLobby'),
+  roomListContainer: document.getElementById('roomListContainer'),
   roomCode: document.getElementById('roomCode'),
   playerList: document.getElementById('playerList'),
   startBtn: document.getElementById('startBtn'),
@@ -25,6 +24,8 @@ const elements = {
 
 let currentRoom = null;
 let myId = null;
+let myName = '';
+let inRoom = false; // 방 입장 여부
 
 // 화면 전환
 function showScreen(screenName) {
@@ -39,38 +40,33 @@ elements.createBtn.addEventListener('click', () => {
     alert('이름을 입력하세요');
     return;
   }
+  if (inRoom) {
+    alert('이미 방에 입장해 있습니다');
+    return;
+  }
+  myName = name;
   socket.emit('createRoom', name);
 });
 
-// 방 참여 모달 열기
+// 방 참여 버튼 - 방 목록 표시
 elements.joinBtn.addEventListener('click', () => {
   const name = elements.playerName.value.trim();
   if (!name) {
     alert('이름을 입력하세요');
     return;
   }
-  elements.joinModal.classList.add('active');
-});
-
-// 방 참여 확인
-elements.confirmJoin.addEventListener('click', () => {
-  const roomId = elements.roomCodeInput.value.trim().toUpperCase();
-  const name = elements.playerName.value.trim();
-  
-  if (!roomId) {
-    alert('방 코드를 입력하세요');
+  if (inRoom) {
+    alert('이미 방에 입장해 있습니다');
     return;
   }
-  
-  socket.emit('joinRoom', { roomId, name });
-  elements.joinModal.classList.remove('active');
-  elements.roomCodeInput.value = '';
+  myName = name;
+  socket.emit('getRooms');
+  showScreen('roomList');
 });
 
-// 모달 취소
-elements.cancelJoin.addEventListener('click', () => {
-  elements.joinModal.classList.remove('active');
-  elements.roomCodeInput.value = '';
+// 뒤로가기
+elements.backToLobby.addEventListener('click', () => {
+  showScreen('lobby');
 });
 
 // 게임 시작
@@ -103,10 +99,53 @@ function updatePlayerList(room) {
   elements.playerList.innerHTML = html;
 }
 
+// 방 목록 표시
+function displayRoomList(rooms) {
+  if (rooms.length === 0) {
+    elements.roomListContainer.innerHTML = '<div class="empty-rooms">참여 가능한 방이 없습니다</div>';
+    return;
+  }
+
+  const html = rooms.map(room => `
+    <div class="room-item" onclick="joinRoomById('${room.id}')">
+      <div class="room-info">
+        <h3>${room.hostName}님의 방</h3>
+        <p>방 코드: ${room.id} | 인원: ${room.playerCount}명</p>
+      </div>
+      <button class="room-join-btn">참여</button>
+    </div>
+  `).join('');
+  
+  elements.roomListContainer.innerHTML = html;
+}
+
+// 방 참여
+window.joinRoomById = function(roomId) {
+  if (inRoom) {
+    alert('이미 방에 입장해 있습니다');
+    return;
+  }
+  socket.emit('joinRoom', { roomId, name: myName });
+};
+
 // 소켓 이벤트
+socket.on('roomList', (rooms) => {
+  displayRoomList(rooms);
+});
+
 socket.on('roomCreated', ({ roomId, room }) => {
   currentRoom = room;
   myId = socket.id;
+  inRoom = true;
+  elements.roomCode.textContent = roomId;
+  updatePlayerList(room);
+  showScreen('waiting');
+});
+
+socket.on('roomJoined', ({ roomId, room }) => {
+  currentRoom = room;
+  myId = socket.id;
+  inRoom = true;
   elements.roomCode.textContent = roomId;
   updatePlayerList(room);
   showScreen('waiting');
@@ -134,8 +173,11 @@ socket.on('roundResult', (result) => {
 });
 
 socket.on('gameOver', ({ winner }) => {
-  alert(`게임 종료! 승자: ${winner}`);
-  showScreen('lobby');
+  setTimeout(() => {
+    alert(`게임 종료! 승자: ${winner || '없음'}`);
+    inRoom = false;
+    showScreen('lobby');
+  }, 1000);
 });
 
 socket.on('newChat', (chatMsg) => {
