@@ -16,17 +16,14 @@ function updateGameUI(room) {
   `).join('');
   playerInfo.innerHTML = html;
 
-  // 드롭다운 옵션 설정
-  const maxNum = room.players.filter(p => !p.spectator).length * 2;
+  // 말할 숫자 드롭다운: 0 ~ (활성 플레이어 수 × 2)
+  const activeCount = room.players.filter(p => !p.spectator).length;
+  const maxSpoken = activeCount * 2;
   const spokenSelect = document.getElementById('spokenNum');
-  const raisedSelect = document.getElementById('raisedNum');
   
   spokenSelect.innerHTML = '';
-  raisedSelect.innerHTML = '';
-  
-  for (let i = 0; i <= maxNum; i++) {
+  for (let i = 0; i <= maxSpoken; i++) {
     spokenSelect.innerHTML += `<option value="${i}">${i}</option>`;
-    raisedSelect.innerHTML += `<option value="${i}">${i}</option>`;
   }
 
   // 현재 턴인 플레이어인지 확인
@@ -37,7 +34,7 @@ function updateGameUI(room) {
   document.getElementById('controls').style.display = 
     (player && !player.spectator) ? 'block' : 'none';
   
-  // 말할 숫자는 현재 턴인 사람만 선택
+  // 말할 숫자는 현재 턴인 사람만 선택 가능
   spokenSelect.disabled = !isMyTurn;
   if (!isMyTurn) {
     spokenSelect.style.opacity = '0.5';
@@ -85,6 +82,8 @@ function startZeroZeroAnimation() {
           controls.style.display = 'none';
           resultDiv.textContent = '다른 플레이어 대기 중...';
         };
+      } else if (player && player.spectator) {
+        resultDiv.textContent = '관전 중...';
       }
     }
   }, 2500);
@@ -101,10 +100,10 @@ function displayResult(result) {
   
   setTimeout(() => {
     if (result.correct) {
-      resultDiv.textContent = `정답! 합계: ${result.total}`;
+      resultDiv.textContent = `✅ 정답! 합계: ${result.total} (${result.currentPlayer} 보너스 턴!)`;
       resultDiv.style.color = '#8b8680';
     } else {
-      resultDiv.textContent = `오답! 합계: ${result.total}`;
+      resultDiv.textContent = `❌ 오답! 합계: ${result.total} ≠ ${result.spokenNum}`;
       resultDiv.style.color = '#d4696e';
     }
   }, 1000);
