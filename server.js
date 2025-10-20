@@ -18,8 +18,9 @@ const rooms = new Map();
 
 // 방 데이터 구조
 class Room {
-  constructor(id) {
+  constructor(id, hostName) {
     this.id = id;
+    this.hostName = hostName;
     this.players = [];
     this.gameStarted = false;
     this.currentTurn = 0;
@@ -31,16 +32,31 @@ class Room {
 io.on('connection', (socket) => {
   console.log('연결됨:', socket.id);
 
+  // 방 목록 요청
+  socket.on('getRooms', () => {
+    const roomList = Array.from(rooms.values())
+      .filter(r => !r.gameStarted)
+      .map(r => ({
+        id: r.id,
+        hostName: r.hostName,
+        playerCount: r.players.length
+      }));
+    socket.emit('roomList', roomList);
+  });
+
   // 방 만들기
   socket.on('createRoom', (name) => {
     const roomId = Math.random().toString(36).substr(2, 6).toUpperCase();
-    const room = new Room(roomId);
+    const room = new Room(roomId, name);
     room.players.push({ id: socket.id, name, lives: 3, spectator: false });
     rooms.set(roomId, room);
     
     socket.join(roomId);
     socket.roomId = roomId;
     socket.emit('roomCreated', { roomId, room });
+    
+    // 방 목록 업데이트 브로드캐스트
+    broadcastRoomList();
   });
 
   // 방 참여
@@ -54,12 +70,20 @@ io.on('connection', (socket) => {
       socket.emit('error', '게임이 이미 시작되었습니다');
       return;
     }
+    if (room.players.find(p => p.id === socket.id)) {
+      socket.emit('error', '이미 참여 중입니다');
+      return;
+    }
 
     room.players.push({ id: socket.id, name, lives: 3, spectator: false });
     socket.join(roomId);
     socket.roomId = roomId;
     
+    socket.emit('roomJoined', { roomId, room });
     io.to(roomId).emit('updateRoom', room);
+    
+    // 방 목록 업데이트
+    broadcastRoomList();
   });
 
   // 게임 시작
@@ -73,6 +97,9 @@ io.on('connection', (socket) => {
     room.gameStarted = true;
     room.currentTurn = 0;
     io.to(socket.roomId).emit('gameStarted', room);
+    
+    // 방 목록에서 제거
+    broadcastRoomList();
   });
 
   // 숫자 선택
@@ -101,7 +128,7 @@ io.on('connection', (socket) => {
         selections: room.selections
       };
 
-      // 틀렸으면 다른 플레이어 라이프 감소
+      // 맞추면 다른 플레이어 라이프 감소
       if (result.correct) {
         room.players.forEach(p => {
           if (p.id !== currentPlayer.id && !p.spectator) {
@@ -121,10 +148,16 @@ io.on('connection', (socket) => {
         if (activeCount <= 1) {
           const winner = room.players.find(p => !p.spectator);
           io.to(socket.roomId).emit('gameOver', { winner: winner?.name });
+          // 게임 종료 후 방 삭제
+          rooms.delete(socket.roomId);
+          broadcastRoomList();
         } else {
-          do {
-            room.currentTurn = (room.currentTurn + 1) % room.players.length;
-          } while (room.players[room.currentTurn].spectator);
+          // 맞추면 보너스 턴, 틀리면 다음 사람
+          if (!result.correct) {
+            do {
+              room.currentTurn = (room.currentTurn + 1) % room.players.length;
+            } while (room.players[room.currentTurn].spectator);
+          }
           
           io.to(socket.roomId).emit('nextTurn', room);
         }
@@ -157,9 +190,21 @@ io.on('connection', (socket) => {
       } else {
         io.to(socket.roomId).emit('updateRoom', room);
       }
+      broadcastRoomList();
     }
   });
 });
+
+function broadcastRoomList() {
+  const roomList = Array.from(rooms.values())
+    .filter(r => !r.gameStarted)
+    .map(r => ({
+      id: r.id,
+      hostName: r.hostName,
+      playerCount: r.players.length
+    }));
+  io.emit('roomList', roomList);
+}
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
